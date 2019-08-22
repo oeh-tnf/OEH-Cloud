@@ -1,0 +1,54 @@
+- hosts: all
+  become: true
+  tasks:
+    - name: "Install Packages"
+      apt:
+        state: present
+        name:
+        - apache2
+        - libapache2-mod-shib2
+        - php
+        - libapache2-mod-php
+    - name: "Configure Shibboleth"
+      copy:
+        src: "shibboleth2.xml"
+        dest: "/etc/shibboleth/shibboleth2.xml"
+        owner: root
+        group: root
+    - name: "Configure Apache"
+      notify: apache2 restart
+      copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        owner: root
+        group: root
+      with_items:
+      - {src: "apache2.conf", dest: "/etc/apache2/apache2.conf"}
+      - {src: "cloud.conf", dest: "/etc/apache2/sites-enabled/001-cloud.conf"}
+    - name: "Enable dav module for apache."
+      notify: apache2 restart
+      apache2_module:
+        state: present
+        name: dav_fs
+    - name: "Remove default apache site."
+      notify: apache2 restart
+      file:
+        path: "/etc/apache2/sites-enabled/000-default.conf"
+        state: "absent"
+    - name: "Setup Cloud directory"
+      notify: apache2 restart
+      file:
+        path: "/var/www/cloud"
+        state: directory
+        owner: root
+        group: root
+    - name: "Install cloud code."
+      copy:
+        src: "cloud/"
+        dest: "/var/www/cloud"
+        owner: www-data
+        group: www-data
+ 
+  handlers:
+    - name: apache2 restart
+      service: name=apache2 state=reloaded
