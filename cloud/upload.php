@@ -11,6 +11,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST)) {
     $target_dir = $current_dir . "/uploads/";
     $orig_file_name = basename($_FILES["file"]["name"]);
     $target_file = $target_dir . $orig_file_name;
+    $ext = pathinfo($orig_file_name, PATHINFO_EXTENSION);
 
     if (file_exists($target_file)) {
 	header("HTTP/1.0 400 Bad Request");
@@ -20,6 +21,11 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST)) {
     else if($_FILES['fileupload']['error'] === UPLOAD_ERR_INI_SIZE) {
 	header("HTTP/1.0 400 Bad Request");
 	echo "File too large.";
+	exit();
+    }
+    else if($ext === "php") {
+	header("HTTP/1.0 400 Bad Request");
+	echo "Illegal File Extension";
 	exit();
     }
     else {
