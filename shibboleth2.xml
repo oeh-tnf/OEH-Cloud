@@ -1,5 +1,6 @@
 <SPConfig xmlns="urn:mace:shibboleth:3.0:native:sp:config"
 	  xmlns:conf="urn:mace:shibboleth:3.0:native:sp:config"
+	  xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"
 	  clockSkew="180">
 
   <OutOfProcess tranLogFormat="%u|%s|%IDP|%i|%ac|%t|%attr|%n|%b|%E|%S|%SS|%L|%UA|%a" />
@@ -10,7 +11,7 @@
   -->
 
   <!-- The ApplicationDefaults element is where most of Shibboleth's SAML bits are defined. -->
-  <ApplicationDefaults entityID="https://cloud.oeh-tnf.at/shibboleth"
+  <ApplicationDefaults entityID="http://{{ domain }}/shibboleth"
 		       REMOTE_USER="eppn subject-id pairwise-id persistent-id"
 		       cipherSuites="DEFAULT:!EXP:!LOW:!aNULL:!eNULL:!DES:!IDEA:!SEED:!RC4:!3DES:!kRSA:!SSLv2:!SSLv3:!TLSv1:!TLSv1.1">
 
@@ -30,7 +31,7 @@
 	  entityID property and adjust discoveryURL to point to discovery service.
 	  You can also override entityID on /Login query string, or in RequestMap/htaccess.
       -->
-      <SSO entityID="https://shibboletht.im.jku.at/idp/shibboleth"
+      <SSO entityID="https://openidp.aco.net/saml"
 	   discoveryProtocol="SAMLDS" discoveryURL="https://eduid.at/entities/idp">
 	SAML2
       </SSO>
@@ -39,7 +40,7 @@
       <Logout>SAML2 Local</Logout>
 
       <!-- Administrative logout. -->
-      <LogoutInitiator type="Admin" Location="/Logout/Admin" acl="127.0.0.1 ::1" />
+      <!-- <LogoutInitiator type="Admin" Location="/Logout/Admin" acl="127.0.0.1 ::1" /> -->
       
       <!-- Extension service that generates "approximate" metadata based on SP configuration. -->
       <Handler type="MetadataGenerator" Location="/Metadata" signing="false"/>
@@ -52,6 +53,17 @@
 
       <!-- JSON feed of discovery information. -->
       <Handler type="DiscoveryFeed" Location="/DiscoFeed"/>
+
+      <!-- OpenIDP: https://openidp.aco.net/saml -->
+      <!-- JKU IDP: https://shibboleth.im.jku.at/idp/shibboleth -->
+      
+      <SessionInitiator type="SAML2" id="WebDAVLogin" Location="/WebDAVLogin"
+			entityID="https://openidp.aco.net/saml"
+			acsIndex="6" 
+			template="bindingTemplate.html"
+			outgoingBindings="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+			authnContextClassRef="http://{{ domain }}/authenticationContext/myclass" >
+      </SessionInitiator>
     </Sessions>
 
     <!--
@@ -64,22 +76,22 @@
 	    styleSheet="/shibboleth-sp/main.css"/>
 
     <!-- Example of locally maintained metadata. -->
-    <!--
-	<MetadataProvider type="XML" validate="true" path="partner-metadata.xml"/>
-    -->
+    <MetadataProvider type="XML" validate="true" path="metadata.xml"/>
 
     <!-- Example of remotely supplied batch of signed metadata. -->
-    <MetadataProvider type="XML" validate="true"
-	url="https://eduid.at/md/aconet-registered.xml"
-	backingFilePath="federation-metadata.xml" maxRefreshDelay="7200">
-	<!-- <MetadataFilter type="RequireValidUntil" maxValidityInterval="2419200"/> -->
-	<!-- <MetadataFilter type="Signature" certificate="fedsigner.pem" verifyBackup="false"/> -->
-	<DiscoveryFilter type="Blacklist" matcher="EntityAttributes" trimTags="true" 
-	attributeName="http://macedir.org/entity-category"
-	attributeNameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri"
-	attributeValue="http://refeds.org/category/hide-from-discovery" />
+    <MetadataProvider type="XML" url="http://eduid.at/md/aconet-registered.xml"
+		      validate="true" backingFilePath="aconet-metadata.xml" reloadInterval="7200">
+      <MetadataFilter type="RequireValidUntil" maxValidityInterval="2419200"/>
+      <MetadataFilter type="Signature" certificate="aconet-metadata-signing.crt" verifyBackup="false"/>
+      <MetadataFilter type="EntityRoleWhiteList">
+	<RetainedRole>md:IDPSSODescriptor</RetainedRole>
+	<RetainedRole>md:AttributeAuthorityDescriptor</RetainedRole>
+      </MetadataFilter>
+      <DiscoveryFilter type="Blacklist" matcher="EntityAttributes" trimTags="true"
+		       attributeName="http://macedir.org/entity-category"
+		       attributeNameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri"
+		       attributeValue="http://refeds.org/category/hide-from-discovery" />
     </MetadataProvider>
-
     <!-- Example of remotely supplied "on-demand" signed metadata. -->
     <!--
 	<MetadataProvider type="MDQ" validate="true" cacheDirectory="mdq"

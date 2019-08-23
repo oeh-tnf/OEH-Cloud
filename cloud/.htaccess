@@ -23,7 +23,7 @@ IndexOptions +Charset=UTF-8 +FancyIndexing +FoldersFirst +HTMLTable +IconsAreLin
 IndexHeadInsert "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />"
 
 # hide ".htaccess" file, "favicon.ico" file and "/theme" directory. Additionally, hide the upload directory.
-IndexIgnore .htaccess favicon.ico /theme upload
+IndexIgnore .htaccess favicon.ico /theme uploads /bootstrap.min.css /dropzone.css /dropzone.js
 
 
 #

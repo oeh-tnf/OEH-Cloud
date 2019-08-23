@@ -1,5 +1,7 @@
 - hosts: all
   become: true
+  vars:
+    domain: "local-office.maximaximal.com"
   tasks:
     - name: "Install Packages"
       apt:
@@ -9,15 +11,76 @@
         - libapache2-mod-shib2
         - php
         - libapache2-mod-php
+        - python-cryptography
+        - python3-cryptography
+        - python-openssl
     - name: "Configure Shibboleth"
-      copy:
+      template:
         src: "shibboleth2.xml"
         dest: "/etc/shibboleth/shibboleth2.xml"
         owner: root
         group: root
+    - name: "Configure Shibboleth metadata"
+      template:
+        src: "metadata.xml"
+        dest: "/etc/shibboleth/metadata.xml"
+        owner: root
+        group: root
+    - name: "Generate signing private key for shibboleth."
+      openssl_privatekey:
+        path: /etc/shibboleth/sp-signing-key.pem
+    - name: "Generate encrypt private key for shibboleth."
+      openssl_privatekey:
+        path: /etc/shibboleth/sp-encrypt-key.pem
+    - name: "Generate signing CSR"
+      openssl_csr:
+        path: /etc/shibboleth/sp-signing.csr
+        privatekey_path: /etc/shibboleth/sp-signing-key.pem
+        common_name: "{{ domain }}"
+    - name: "Generate encryption CSR"
+      openssl_csr:
+        path: /etc/shibboleth/sp-encryption.csr
+        privatekey_path: /etc/shibboleth/sp-encrypt-key.pem
+        common_name: "{{ domain }}"
+    - name: "Generate signing certificate"
+      openssl_certificate:
+        path: /etc/shibboleth/sp-signing-cert.pem
+        privatekey_path: /etc/shibboleth/sp-signing-key.pem
+        csr_path: /etc/shibboleth/sp-signing.csr
+        provider: selfsigned
+    - name: "Generate encryption certificate"
+      openssl_certificate:
+        path: /etc/shibboleth/sp-encrypt-cert.pem
+        privatekey_path: /etc/shibboleth/sp-encrypt-key.pem
+        csr_path: /etc/shibboleth/sp-encryption.csr
+        provider: selfsigned
+    - name: "Generate signing public key."
+      openssl_publickey:
+        path: /etc/shibboleth/sp-signing-key-pub.pem
+        privatekey_path: /etc/shibboleth/sp-signing-key.pem
+    - name: "Generate encrypt public key."
+      openssl_publickey:
+        path: /etc/shibboleth/sp-encrypt-key-pub.pem
+        privatekey_path: /etc/shibboleth/sp-encrypt-key.pem
+    - name: "Install aconet metadata signing key."
+      copy:
+        src: "aconet-metadata-signing.crt"
+        dest: "/etc/shibboleth/aconet-metadata-signing.crt"
+        owner: www-data
+        group: www-data
+    - name: "Setup permissions for shibboleth keys."
+      file:
+        path: "{{ item }}"
+        owner: www-data
+        group: www-data
+      with_items:
+        - "/etc/shibboleth/sp-signing-key.pem"
+        - "/etc/shibboleth/sp-encrypt-key.pem"
+        - "/etc/shibboleth/sp-signing-cert.pem"
+        - "/etc/shibboleth/sp-encrypt-cert.pem"
     - name: "Configure Apache"
       notify: apache2 restart
-      copy:
+      template:
         src: "{{ item.src }}"
         dest: "{{ item.dest }}"
         owner: root
@@ -51,4 +114,6 @@
  
   handlers:
     - name: apache2 restart
-      service: name=apache2 state=reloaded
+      service: name=apache2 state=restarted
+    - name: shibd restart
+      service: name=shibd state=restarted
